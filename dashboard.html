@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Red Onion Analytics Dashboard</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 sidebar">
+                <div class="sidebar-header">
+                    <h4><i class="fas fa-seedling"></i> OnionShield AI</h4>
+                </div>
+                
+                <div class="system-controls">
+                    <h6>System Controls</h6>
+                    
+                    <div class="control-group">
+                        <label>Detection Sensitivity</label>
+                        <div class="slider-container">
+                            <input type="range" class="form-range" min="1" max="10" value="8" id="sensitivity">
+                            <div class="slider-indicator"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Model Version</label>
+                        <select class="form-select" id="modelVersion">
+                            <option value="lstm_v3.2">LSTM Predictor v3.2</option>
+                            <option value="arima_v2.1">ARIMA Model v2.1</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Province Filter</label>
+                        <select class="form-select" id="provinceFilter">
+                            <option value="all">All Provinces</option>
+                            {% for province in provinces %}
+                            <option value="{{ province }}">{{ province }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Date Range</label>
+                        <input type="date" class="form-control mb-2" id="startDate">
+                        <input type="date" class="form-control" id="endDate">
+                    </div>
+                    
+                    <button class="btn btn-primary w-100 mt-3" id="startMonitoring">
+                        <i class="fas fa-play"></i> Start Real-time Monitoring
+                    </button>
+                    
+                    <button class="btn btn-secondary w-100 mt-2" id="pauseDetection">
+                        <i class="fas fa-pause"></i> Pause Detection
+                    </button>
+                </div>
+                
+                <div class="system-status">
+                    <h6>System Status</h6>
+                    <div class="status-item">
+                        <span>Data Analyzed:</span>
+                        <span class="status-value">{{ system_status.data_analyzed or 0 }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span>Avg. Processing Time:</span>
+                        <span class="status-value">{{ system_status.avg_processing_time or '0ms' }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span>Anomalies Detected:</span>
+                        <span class="status-value text-warning">{{ system_status.anomalies_detected or 0 }}</span>
+                    </div>
+                    <div class="status-item">
+                        <span>False Positives:</span>
+                        <span class="status-value">{{ system_status.false_positives or '0 (0%)' }}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 main-content">
+                <!-- Header -->
+                <div class="dashboard-header">
+                    <div class="header-info">
+                        <h2>Red Onion Commodity Analytics</h2>
+                        <p class="text-muted">Real-time Price Monitoring & LSTM Predictions</p>
+                    </div>
+                    <div class="header-controls">
+                        <div class="time-filter">
+                            <span class="badge bg-primary">Last Hour</span>
+                            <span class="badge bg-outline-secondary">Last 24h</span>
+                            <span class="badge bg-outline-secondary">Custom</span>
+                        </div>
+                        <button class="btn btn-outline-primary">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- KPI Cards -->
+                <div class="row kpi-cards">
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card kpi-card">
+                            <div class="card-body">
+                                <div class="kpi-header">
+                                    <span class="kpi-label">Total Records</span>
+                                    <i class="fas fa-database kpi-icon"></i>
+                                </div>
+                                <div class="kpi-value">{{ kpis.total_records or 0 }}</div>
+                                <div class="kpi-change positive">
+                                    <i class="fas fa-arrow-up"></i> Data Quality: High
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card kpi-card">
+                            <div class="card-body">
+                                <div class="kpi-header">
+                                    <span class="kpi-label">Price Volatility</span>
+                                    <i class="fas fa-exclamation-triangle kpi-icon text-warning"></i>
+                                </div>
+                                <div class="kpi-value">{{ kpis.price_volatility or 0 }}%</div>
+                                <div class="kpi-change {% if kpis.price_volatility and kpis.price_volatility > 10 %}negative{% else %}positive{% endif %}">
+                                    <i class="fas fa-{% if kpis.price_volatility and kpis.price_volatility > 10 %}arrow-up{% else %}check-circle{% endif %}"></i> 
+                                    {% if kpis.price_volatility and kpis.price_volatility > 10 %}High Volatility{% else %}Stable{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card kpi-card">
+                            <div class="card-body">
+                                <div class="kpi-header">
+                                    <span class="kpi-label">Avg. Price</span>
+                                    <i class="fas fa-coins kpi-icon text-success"></i>
+                                </div>
+                                <div class="kpi-value">Rp{{ "{:,.0f}".format(kpis.avg_price or 0) }}</div>
+                                <div class="kpi-change positive">
+                                    <i class="fas fa-chart-line"></i> Market Trend
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card kpi-card">
+                            <div class="card-body">
+                                <div class="kpi-header">
+                                    <span class="kpi-label">Model Accuracy</span>
+                                    <i class="fas fa-check-circle kpi-icon text-success"></i>
+                                </div>
+                                <div class="kpi-value">{{ kpis.prediction_accuracy or 0 }}%</div>
+                                <div class="kpi-change positive">
+                                    <i class="fas fa-brain"></i> LSTM Active
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chart Section -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card chart-card">
+                            <div class="card-header">
+                                <h5>Real-time Price Monitoring</h5>
+                                <div class="chart-controls">
+                                    <i class="fas fa-download" title="Export Data"></i>
+                                    <i class="fas fa-expand" title="Fullscreen"></i>
+                                    <i class="fas fa-sync-alt" title="Refresh" id="refreshChart"></i>
+                                    <i class="fas fa-ellipsis-h" title="More Options"></i>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <h6 class="chart-title">Price Trends with LSTM Predictions</h6>
+                                <div class="chart-container">
+                                    <canvas id="priceChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Bottom Section -->
+                <div class="row mt-4">
+                    <!-- Recent Alerts -->
+                    <div class="col-md-6">
+                        <div class="card alerts-card">
+                            <div class="card-header">
+                                <h5>Recent Price Alerts</h5>
+                            </div>
+                            <div class="card-body">
+                                {% if alerts %}
+                                    {% for alert in alerts %}
+                                    <div class="alert-item">
+                                        <div class="alert-icon">
+                                            <i class="fas fa-exclamation-triangle text-{% if alert.type == 'High' %}danger{% else %}warning{% endif %}"></i>
+                                        </div>
+                                        <div class="alert-content">
+                                            <div class="alert-message">{{ alert.type }} Confidence: {{ alert.message }}</div>
+                                            <div class="alert-details">Price: Rp{{ "{:,.0f}".format(alert.price) }} • {{ alert.date }}</div>
+                                        </div>
+                                        <div class="alert-time">Recent</div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="no-alerts">
+                                        <i class="fas fa-shield-alt text-success"></i>
+                                        <p>No recent alerts. System operating normally.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Data -->
+                    <div class="col-md-6">
+                        <div class="card data-table-card">
+                            <div class="card-header">
+                                <h5>Recent Data</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Province</th>
+                                                <th>Price</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="dataTable">
+                                            {% if recent_data %}
+                                                {% for row in recent_data %}
+                                                <tr>
+                                                    <td>{{ row.Date }}</td>
+                                                    <td>{{ row.Provinsi }}</td>
+                                                    <td>Rp{{ "{:,.0f}".format(row.Harga) }}</td>
+                                                    <td><span class="badge bg-success">Normal</span></td>
+                                                </tr>
+                                                {% endfor %}
+                                            {% else %}
+                                                <tr>
+                                                    <td colspan="4" class="text-center text-muted">No data available</td>
+                                                </tr>
+                                            {% endif %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Error Modal -->
+    {% if error %}
+    <div class="modal fade" id="errorModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Data Loading Error</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Unable to load commodity data.</strong>
+                    </div>
+                    <p>{{ error }}</p>
+                    <p><strong>Please ensure:</strong></p>
+                    <ul>
+                        <li>The CSV file is properly uploaded</li>
+                        <li>The file contains valid red onion price data</li>
+                        <li>Required columns are present: Date, Commodity, Provinsi, Harga</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    
+    {% if error %}
+    <script>
+        $(document).ready(function() {
+            $('#errorModal').modal('show');
+        });
+    </script>
+    {% endif %}
+</body>
+</html>
